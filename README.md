@@ -507,7 +507,7 @@ This project demonstrates practical experience with:
 
 ## Author
 
-Aniket Satpathy
+Dhinesh Babu C M
 
 Industry-Oriented IoT Project
 
