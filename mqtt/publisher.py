@@ -4,9 +4,9 @@ import json
 
 import paho.mqtt.client as mqtt
 
-BROKER = "localhost"
+BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC = "home/energy"
+TOPIC = "smart_home_energy"
 
 client = mqtt.Client()
 
