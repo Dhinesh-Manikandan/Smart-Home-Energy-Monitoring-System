@@ -9,16 +9,40 @@
     { "type": "wokwi-potentiometer", "id": "pot_tv", "top": 50, "left": -200, "attrs": {} },
     { "type": "wokwi-potentiometer", "id": "pot_fridge", "top": 150, "left": -200, "attrs": {} },
     { "type": "wokwi-potentiometer", "id": "pot_ac", "top": 250, "left": -200, "attrs": {} },
-    { "type": "board-ssd1306", "id": "oled1", "top": 200, "left": 100, "attrs": {} },
+    { "type": "board-ssd1306", "id": "oled1", "top": -180, "left": 150, "attrs": {} },
     { "type": "wokwi-text", "id": "lbl_v", "top": -130, "left": -380, "attrs": { "text": "Voltage (200-250V)" } },
     { "type": "wokwi-text", "id": "lbl_fan", "top": -30, "left": -380, "attrs": { "text": "Fan Current (0-2A)" } },
     { "type": "wokwi-text", "id": "lbl_tv", "top": 70, "left": -380, "attrs": { "text": "TV Current (0-1.5A)" } },
     { "type": "wokwi-text", "id": "lbl_fridge", "top": 170, "left": -380, "attrs": { "text": "Fridge Current (0-3A)" } },
-    { "type": "wokwi-text", "id": "lbl_ac", "top": 270, "left": -380, "attrs": { "text": "AC Current (0-8A)" } }
+    { "type": "wokwi-text", "id": "lbl_ac", "top": 270, "left": -380, "attrs": { "text": "AC Current (0-8A)" } },
+    { "type": "wokwi-relay-module", "id": "relay_fan", "top": -50, "left": 150, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay_tv", "top": 50, "left": 150, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay_fridge", "top": 150, "left": 150, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay_ac", "top": 250, "left": 150, "attrs": {} },
+    { "type": "wokwi-text", "id": "lbl_rfan", "top": -30, "left": 230, "attrs": { "text": "Fan Relay" } },
+    { "type": "wokwi-text", "id": "lbl_rtv", "top": 70, "left": 230, "attrs": { "text": "TV Relay" } },
+    { "type": "wokwi-text", "id": "lbl_rfridge", "top": 170, "left": 230, "attrs": { "text": "Fridge Relay" } },
+    { "type": "wokwi-text", "id": "lbl_rac", "top": 270, "left": 230, "attrs": { "text": "AC Relay" } }
   ],
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
     [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    
+    [ "esp:3V3", "relay_fan:VCC", "red", [ "v0" ] ],
+    [ "esp:GND", "relay_fan:GND", "black", [ "v0" ] ],
+    [ "esp:16", "relay_fan:IN", "green", [ "v0" ] ],
+    
+    [ "esp:3V3", "relay_tv:VCC", "red", [ "v0" ] ],
+    [ "esp:GND", "relay_tv:GND", "black", [ "v0" ] ],
+    [ "esp:17", "relay_tv:IN", "green", [ "v0" ] ],
+    
+    [ "esp:3V3", "relay_fridge:VCC", "red", [ "v0" ] ],
+    [ "esp:GND", "relay_fridge:GND", "black", [ "v0" ] ],
+    [ "esp:18", "relay_fridge:IN", "green", [ "v0" ] ],
+    
+    [ "esp:3V3", "relay_ac:VCC", "red", [ "v0" ] ],
+    [ "esp:GND", "relay_ac:GND", "black", [ "v0" ] ],
+    [ "esp:19", "relay_ac:IN", "green", [ "v0" ] ],
     
     [ "esp:3V3", "pot_v:VCC", "red", [ "v0" ] ],
     [ "esp:GND", "pot_v:GND", "black", [ "v0" ] ],

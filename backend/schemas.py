@@ -16,6 +16,8 @@ class EnergyReadingCreate(BaseModel):
 
     appliance: str
 
+    state: str = "ON"
+
     alert: str
 
 

@@ -144,6 +144,25 @@ st.divider()
 # OVERVIEW PAGE
 # ============================================================
 
+import paho.mqtt.client as mqtt
+import json
+
+def publish_command(appliance, command):
+    try:
+        client = mqtt.Client()
+        client.connect("broker.hivemq.com", 1883, 60)
+        payload = json.dumps({
+            "device": "ESP32_LivingRoom",
+            "appliance": appliance.lower(),
+            "command": command
+        })
+        client.publish("smart_home_energy/command", payload)
+        client.disconnect()
+        return True
+    except Exception as e:
+        st.error(f"Failed to send command: {e}")
+        return False
+
 if page == "Overview":
 
     latest_appliances = df.sort_values("timestamp").groupby("appliance").tail(1)
@@ -213,6 +232,51 @@ if page == "Overview":
 </div>
 """
             st.markdown(html_content, unsafe_allow_html=True)
+
+    st.divider()
+
+    import time
+    st.markdown("### 🎛️ APPLIANCE CONTROL CENTER")
+    
+    ctrl_cols = st.columns(4)
+    for idx, (_, row) in enumerate(latest_appliances.iterrows()):
+        app_name = row["appliance"]
+        icon = icons.get(app_name, "🔌")
+        
+        # Use the actual hardware relay state reported by ESP32 -> MQTT -> DB
+        state = row.get("state", "ON")
+        
+        if state == "ON":
+            status_html = """<div style="background-color: rgba(34, 197, 94, 0.15); color: #4ade80; padding: 6px 12px; border-radius: 20px; display: inline-block; font-weight: bold; font-size: 14px; border: 1px solid rgba(34, 197, 94, 0.4); margin-bottom: 10px;">🟢 ONLINE</div>"""
+            border_color = "#4ade80"
+        else:
+            status_html = """<div style="background-color: rgba(239, 68, 68, 0.15); color: #f87171; padding: 6px 12px; border-radius: 20px; display: inline-block; font-weight: bold; font-size: 14px; border: 1px solid rgba(239, 68, 68, 0.4); margin-bottom: 10px;">🔴 OFFLINE</div>"""
+            border_color = "#ef4444"
+            
+        with ctrl_cols[idx % 4]:
+            card_html = f"""
+            <div style="padding: 20px; background-color: #1e293b; border-radius: 12px; border-top: 4px solid {border_color}; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="margin-top: 0; margin-bottom: 15px; color: #f8fafc;">{icon} {app_name.upper()}</h3>
+                {status_html}
+                <div style="font-size: 28px; font-weight: bold; color: #f1f5f9; margin-top: 5px;">{row['power']:.0f} W</div>
+                <div style="color: #94a3b8; font-size: 14px; margin-top: 2px; margin-bottom: 15px;">Current: {row['current']:.2f} A</div>
+            </div>
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Single clear action button
+            if state == "ON":
+                if st.button("🛑 TURN OFF", key=f"off_{app_name}", use_container_width=True):
+                    publish_command(app_name, "OFF")
+                    st.toast(f"Shutting down {app_name}...")
+                    time.sleep(1.2)
+                    st.rerun()
+            else:
+                if st.button("⚡ TURN ON", key=f"on_{app_name}", use_container_width=True, type="primary"):
+                    publish_command(app_name, "ON")
+                    st.toast(f"Starting {app_name}...")
+                    time.sleep(1.2)
+                    st.rerun()
 
     st.divider()
 

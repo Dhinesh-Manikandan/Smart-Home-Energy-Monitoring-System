@@ -3,7 +3,7 @@
 from .models import EnergyReading
 
 
-def create_reading(db, voltage, current, power, energy, cost, appliance, alert):
+def create_reading(db, voltage, current, power, energy, cost, appliance, state, alert):
 
     reading = EnergyReading(
         voltage=voltage,
@@ -12,6 +12,7 @@ def create_reading(db, voltage, current, power, energy, cost, appliance, alert):
         energy=energy,
         cost=cost,
         appliance=appliance,
+        state=state,
         alert=alert,
     )
 

@@ -117,6 +117,12 @@ def on_message(client, userdata, msg):
             else:
                 alert = "NORMAL"
 
+            state = "ON"
+            for app_name, app_data in payload.get("appliances", {}).items():
+                if app_name.title() == appliance:
+                    state = app_data.get("state", "ON")
+                    break
+
             api_payload = {
                 "voltage": voltage,
                 "current": current,
@@ -124,6 +130,7 @@ def on_message(client, userdata, msg):
                 "energy": energy,
                 "cost": cost,
                 "appliance": appliance,
+                "state": state,
                 "alert": alert,
             }
 
@@ -144,6 +151,7 @@ def on_message(client, userdata, msg):
             print(f"Power   : {power:.2f} W")
             print(f"Energy  : {energy:.4f} kWh")
             print(f"Cost    : ₹ {cost:.2f}")
+            print(f"State   : {state}")
             print(f"Alert   : {alert}")
             print(f"API Status: {response.status_code}")
             print("================================")

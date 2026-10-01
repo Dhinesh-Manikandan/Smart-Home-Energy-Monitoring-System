@@ -49,6 +49,7 @@ def add_reading(reading: EnergyReadingCreate, db: Session = Depends(get_db)):
         energy=reading.energy,
         cost=reading.cost,
         appliance=reading.appliance,
+        state=reading.state,
         alert=reading.alert,
     )
 

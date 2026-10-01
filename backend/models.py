@@ -43,6 +43,8 @@ class EnergyReading(Base):
 
     appliance = Column(String)
 
+    state = Column(String, default="ON")
+
     alert = Column(String)
 
 
