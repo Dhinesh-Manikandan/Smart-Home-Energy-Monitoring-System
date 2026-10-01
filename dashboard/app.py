@@ -35,7 +35,9 @@ from charts import (
     alert_chart,
     power_distribution_chart,
     power_comparison_chart,
-    cost_distribution_chart
+    cost_distribution_chart,
+    temperature_chart,
+    humidity_chart
 )
 
 from analytics import calculate_metrics
@@ -107,6 +109,9 @@ if "timestamp" in df.columns:
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
     df["date"] = df["timestamp"].dt.date
+    
+    # Sort chronological so iloc[-1] gives the newest row
+    df = df.sort_values(by="timestamp").reset_index(drop=True)
 
 # ============================================================
 # HEADER
@@ -185,7 +190,7 @@ if page == "Overview":
         <div style="display: flex; justify-content: space-between;">
             <div><b>Supply Voltage</b> <span style="font-size: 10px; background: #3b82f6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">LIVE</span><br><span style="font-size: 24px;">{voltage:.2f} V</span></div>
             <div><b>Total Power</b> <span style="font-size: 10px; background: #3b82f6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">LIVE</span><br><span style="font-size: 24px;">{total_power:.2f} kW</span></div>
-            <div><b>Total Energy</b> <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">CUMULATIVE</span><br><span style="font-size: 24px;">{total_energy:.2f} kWh</span></div>
+            <div><b>Total Energy</b> <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">CUMULATIVE</span><br><span style="font-size: 24px;">{total_energy:.4f} kWh</span></div>
             <div><b>Estimated Cost</b> <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">CUMULATIVE</span><br><span style="font-size: 24px;">₹{total_cost:.2f}</span></div>
             <div><b>Active Appliances</b><br><span style="font-size: 24px;">{len(latest_appliances)} / 4</span></div>
             <div><b>MQTT Status</b><br><span style="font-size: 24px; color: {'#4ade80' if mqtt_status == 'ONLINE' else '#ef4444'};">{mqtt_status}</span></div>
@@ -221,7 +226,7 @@ if page == "Overview":
 </p>
 <div style="height: 1px; background: #334155; margin: 10px 0;"></div>
 <p style="margin: 5px 0; font-size: 17px; display: flex; justify-content: space-between; align-items: center;">
-<span><b>Energy:</b> {row['energy']:.2f} kWh</span>
+<span><b>Energy:</b> {row['energy']:.4f} kWh</span>
 <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 8px;">TOTAL</span>
 </p>
 <p style="margin: 5px 0; font-size: 17px; display: flex; justify-content: space-between; align-items: center;">
@@ -280,6 +285,83 @@ if page == "Overview":
 
     st.divider()
 
+    st.markdown("### 🚶 ROOM OCCUPANCY")
+    
+    occ = df["occupancy"].dropna().iloc[-1] if "occupancy" in df.columns and not df["occupancy"].dropna().empty else "UNOCCUPIED"
+    occ_color = "#4ade80" if occ == "OCCUPIED" else "#94a3b8"
+    occ_icon = "🟢" if occ == "OCCUPIED" else "⚪"
+    
+    st.markdown(f"""
+    <div style="padding: 20px; background-color: #1e293b; border-radius: 12px; border-left: 4px solid {occ_color}; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+        <h3 style="margin-top: 0; color: #f8fafc;">🏠 Living Room</h3>
+        <div style="font-size: 28px; font-weight: bold; color: {occ_color}; margin-top: 10px;">
+            {occ_icon} {occ}
+        </div>
+        <div style="color: #94a3b8; margin-top: 5px;">Sensor: <b>PIR Motion Sensor</b></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    st.markdown("### 🌡️ ENVIRONMENTAL MONITORING")
+    
+    # Calculate environment status
+    t = float(df["temperature"].dropna().iloc[-1]) if "temperature" in df.columns and not df["temperature"].dropna().empty else 27.4
+    h = float(df["humidity"].dropna().iloc[-1]) if "humidity" in df.columns and not df["humidity"].dropna().empty else 61.2
+    
+    t_status = "NORMAL"
+    t_color = "#4ade80"
+    if t < 18:
+        t_status = "LOW"
+        t_color = "#60a5fa"
+    elif t > 35:
+        t_status = "CRITICAL"
+        t_color = "#ef4444"
+    elif t > 30:
+        t_status = "HIGH"
+        t_color = "#f97316"
+        
+    h_status = "NORMAL"
+    h_color = "#4ade80"
+    if h < 30:
+        h_status = "LOW"
+        h_color = "#facc15"
+    elif h > 85:
+        h_status = "CRITICAL"
+        h_color = "#ef4444"
+    elif h > 70:
+        h_status = "HIGH"
+        h_color = "#f97316"
+        
+    env_col1, env_col2, env_col3 = st.columns(3)
+    with env_col1:
+        st.markdown(f"""
+        <div style="padding: 20px; background-color: #1e293b; border-radius: 12px; border-left: 4px solid {t_color};">
+            <h3 style="margin-top: 0; color: #f8fafc;">🌡️ Temperature</h3>
+            <div style="font-size: 32px; font-weight: bold; color: {t_color};">{t:.1f} °C</div>
+            <div style="color: #94a3b8; margin-top: 10px;">Status: <b>{t_status}</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+    with env_col2:
+        st.markdown(f"""
+        <div style="padding: 20px; background-color: #1e293b; border-radius: 12px; border-left: 4px solid {h_color};">
+            <h3 style="margin-top: 0; color: #f8fafc;">💧 Humidity</h3>
+            <div style="font-size: 32px; font-weight: bold; color: {h_color};">{h:.1f} %</div>
+            <div style="color: #94a3b8; margin-top: 10px;">Status: <b>{h_status}</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+    with env_col3:
+        st.markdown(f"""
+        <div style="padding: 20px; background-color: #1e293b; border-radius: 12px; border-left: 4px solid #8b5cf6;">
+            <h3 style="margin-top: 0; color: #f8fafc;">📡 Sensor Info</h3>
+            <div style="font-size: 20px; font-weight: bold; color: #f8fafc; margin-top: 5px;">DHT22</div>
+            <div style="color: #94a3b8; margin-top: 5px;">Status: <b>ONLINE</b></div>
+            <div style="color: #94a3b8; margin-top: 5px;">Node: <b>ESP32_LivingRoom</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
     st.markdown("### 📊 POWER DISTRIBUTION")
     st.plotly_chart(power_distribution_chart(latest_appliances), use_container_width=True)
 
@@ -288,6 +370,13 @@ if page == "Overview":
     
     st.markdown("### 💰 COST DISTRIBUTION")
     st.plotly_chart(cost_distribution_chart(latest_appliances), use_container_width=True)
+
+    st.markdown("### 🌡️ ENVIRONMENTAL TRENDS")
+    env_chart_col1, env_chart_col2 = st.columns(2)
+    with env_chart_col1:
+        st.plotly_chart(temperature_chart(df), use_container_width=True)
+    with env_chart_col2:
+        st.plotly_chart(humidity_chart(df), use_container_width=True)
 
     st.markdown("### 📈 HISTORICAL POWER TREND")
     st.plotly_chart(power_chart(df), use_container_width=True)

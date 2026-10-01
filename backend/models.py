@@ -47,6 +47,12 @@ class EnergyReading(Base):
 
     alert = Column(String)
 
+    temperature = Column(Float, nullable=True)
+
+    humidity = Column(Float, nullable=True)
+
+    occupancy = Column(String, default="UNOCCUPIED")
+
 
 class SystemMetrics(Base):
 

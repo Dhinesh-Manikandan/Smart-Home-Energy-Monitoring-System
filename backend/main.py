@@ -51,6 +51,9 @@ def add_reading(reading: EnergyReadingCreate, db: Session = Depends(get_db)):
         appliance=reading.appliance,
         state=reading.state,
         alert=reading.alert,
+        temperature=reading.temperature,
+        humidity=reading.humidity,
+        occupancy=reading.occupancy,
     )
 
 

@@ -73,6 +73,11 @@ def on_message(client, userdata, msg):
         last_timestamp = current_time
 
         readings_to_process = []
+        
+        env = payload.get("environment", {})
+        temp = env.get("temperature")
+        hum = env.get("humidity")
+        occ = payload.get("occupancy", "UNOCCUPIED")
 
         if "appliances" in payload:
             base_voltage = float(payload.get("voltage", 230.0))
@@ -132,6 +137,9 @@ def on_message(client, userdata, msg):
                 "appliance": appliance,
                 "state": state,
                 "alert": alert,
+                "temperature": temp,
+                "humidity": hum,
+                "occupancy": occ,
             }
 
             response = requests.post(
@@ -153,6 +161,10 @@ def on_message(client, userdata, msg):
             print(f"Cost    : ₹ {cost:.2f}")
             print(f"State   : {state}")
             print(f"Alert   : {alert}")
+            if temp is not None:
+                print(f"Temp    : {temp} °C")
+                print(f"Hum     : {hum} %")
+            print(f"Occupancy: {occ}")
             print(f"API Status: {response.status_code}")
             print("================================")
 

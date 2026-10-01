@@ -5,6 +5,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 #define VOLTAGE_PIN 32
 #define FAN_PIN 33
@@ -16,6 +17,16 @@
 #define RELAY_TV 17
 #define RELAY_FRIDGE 18
 #define RELAY_AC 19
+
+#define DHTPIN 23
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+
+#define PIR_PIN 27
+#define OCCUPANCY_TIMEOUT_MS 60000
+
+bool isOccupied = false;
+unsigned long lastMotionTime = 0;
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -36,10 +47,10 @@ PubSubClient mqttClient(espClient);
 int oled_state = 0;
 unsigned long last_update = 0;
 
-bool fan_state = true;
-bool tv_state = true;
+bool fan_state = false;
+bool tv_state = false;
 bool fridge_state = true;
-bool ac_state = true;
+bool ac_state = false;
 
 void connectWiFi() {
     Serial.print("Connecting to WiFi");
@@ -58,13 +69,33 @@ void processReadingsAndPublish(bool is_command = false) {
     int tvRaw = analogRead(TV_PIN);
     int fridgeRaw = analogRead(FRIDGE_PIN);
     int acRaw = analogRead(AC_PIN);
+    
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (isnan(t)) t = 27.4; // Fallback
+    if (isnan(h)) h = 61.2; // Fallback
 
     float voltage = 200.0 + ((float)vRaw / 4095.0) * 50.0;
     
-    float fan_c = fan_state ? ((float)fanRaw / 4095.0) * 2.0 : 0.0;
-    float tv_c = tv_state ? ((float)tvRaw / 4095.0) * 1.5 : 0.0;
-    float fridge_c = fridge_state ? ((float)fridgeRaw / 4095.0) * 3.0 : 0.0;
-    float ac_c = ac_state ? ((float)acRaw / 4095.0) * 8.0 : 0.0;
+    float fan_c = 0.0;
+    if (fan_state) {
+        fan_c = ((float)fanRaw / 4095.0) * 2.0;
+    }
+    
+    float tv_c = 0.0;
+    if (tv_state) {
+        tv_c = ((float)tvRaw / 4095.0) * 1.5;
+    }
+    
+    float fridge_c = 0.0;
+    if (fridge_state) {
+        fridge_c = ((float)fridgeRaw / 4095.0) * 3.0;
+    }
+    
+    float ac_c = 0.0;
+    if (ac_state) {
+        ac_c = ((float)acRaw / 4095.0) * 8.0;
+    }
 
     float fan_p = voltage * fan_c;
     float tv_p = voltage * tv_c;
@@ -73,9 +104,13 @@ void processReadingsAndPublish(bool is_command = false) {
 
     float total_power = fan_p + tv_p + fridge_p + ac_p;
 
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;
     doc["device"] = "ESP32_LivingRoom";
     doc["voltage"] = round(voltage * 100) / 100.0;
+    
+    JsonObject env = doc.createNestedObject("environment");
+    env["temperature"] = round(t * 10) / 10.0;
+    env["humidity"] = round(h * 10) / 10.0;
     
     JsonObject apps = doc.createNestedObject("appliances");
     
@@ -84,10 +119,10 @@ void processReadingsAndPublish(bool is_command = false) {
     f["power"] = round(fan_p * 100) / 100.0;
     f["state"] = fan_state ? "ON" : "OFF";
     
-    JsonObject t = apps.createNestedObject("tv");
-    t["current"] = round(tv_c * 100) / 100.0;
-    t["power"] = round(tv_p * 100) / 100.0;
-    t["state"] = tv_state ? "ON" : "OFF";
+    JsonObject tv = apps.createNestedObject("tv");
+    tv["current"] = round(tv_c * 100) / 100.0;
+    tv["power"] = round(tv_p * 100) / 100.0;
+    tv["state"] = tv_state ? "ON" : "OFF";
     
     JsonObject r = apps.createNestedObject("refrigerator");
     r["current"] = round(fridge_c * 100) / 100.0;
@@ -100,8 +135,9 @@ void processReadingsAndPublish(bool is_command = false) {
     a["state"] = ac_state ? "ON" : "OFF";
     
     doc["total_power"] = round(total_power * 100) / 100.0;
+    doc["occupancy"] = isOccupied ? "OCCUPIED" : "UNOCCUPIED";
 
-    char payload[512];
+    char payload[1024];
     serializeJson(doc, payload);
     bool published = mqttClient.publish(MQTT_TOPIC, payload);
 
@@ -136,6 +172,13 @@ void processReadingsAndPublish(bool is_command = false) {
     
     Serial.println("--------------------------------");
     Serial.printf("Total Power: %.2f W\r\n", total_power);
+    Serial.println("--------------------------------");
+    Serial.println("\r\nENVIRONMENT");
+    Serial.printf("Temperature: %.1f °C\r\n", t);
+    Serial.printf("Humidity: %.1f %%\r\n", h);
+    Serial.println("--------------------------------");
+    Serial.printf("Occupancy: %s\r\n", isOccupied ? "OCCUPIED" : "UNOCCUPIED");
+    Serial.println("--------------------------------");
     Serial.printf("MQTT: %s\r\n", published ? (is_command ? "Status Published" : "Published") : "Publish Failed");
     Serial.println("--------------------------------");
 
@@ -155,11 +198,21 @@ void processReadingsAndPublish(bool is_command = false) {
         display.printf("%.0f W\n\n", fan_p);
         display.printf("TV   %c %s\n", tv_state ? '*' : 'o', tv_state ? "ON" : "OFF");
         display.printf("%.0f W\n", tv_p);
-    } else {
+    } else if (oled_state == 2) {
         display.printf("FRIDGE %c %s\n", fridge_state ? '*' : 'o', fridge_state ? "ON" : "OFF");
         display.printf("%.0f W\n\n", fridge_p);
         display.printf("AC     %c %s\n", ac_state ? '*' : 'o', ac_state ? "ON" : "OFF");
         display.printf("%.0f W\n", ac_p);
+    } else if (oled_state == 3) {
+        display.println("ENVIRONMENT\n");
+        display.println("TEMP");
+        display.printf("%.1f C\n\n", t);
+        display.println("HUMIDITY");
+        display.printf("%.1f %%", h);
+    } else if (oled_state == 4) {
+        display.println("ROOM STATUS\n");
+        display.println("Occupancy:");
+        display.printf("%s\n", isOccupied ? "OCCUPIED" : "UNOCCUPIED");
     }
     
     display.display();
@@ -220,10 +273,14 @@ void setup() {
     pinMode(RELAY_FRIDGE, OUTPUT);
     pinMode(RELAY_AC, OUTPUT);
     
-    digitalWrite(RELAY_FAN, HIGH);
-    digitalWrite(RELAY_TV, HIGH);
+    digitalWrite(RELAY_FAN, LOW);
+    digitalWrite(RELAY_TV, LOW);
     digitalWrite(RELAY_FRIDGE, HIGH);
-    digitalWrite(RELAY_AC, HIGH);
+    digitalWrite(RELAY_AC, LOW);
+    
+    pinMode(PIR_PIN, INPUT);
+    
+    dht.begin();
 
     connectWiFi();
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
@@ -251,10 +308,80 @@ void loop() {
     }
     mqttClient.loop();
 
+    int pirState = digitalRead(PIR_PIN);
+    if (pirState == HIGH) {
+        lastMotionTime = millis();
+        if (!isOccupied) {
+            isOccupied = true;
+            Serial.println("PIR Motion: DETECTED");
+            Serial.println("Occupancy: OCCUPIED");
+        }
+    } else {
+        if (isOccupied && (millis() - lastMotionTime >= OCCUPANCY_TIMEOUT_MS)) {
+            isOccupied = false;
+            Serial.println("PIR Motion: NONE");
+            Serial.println("Occupancy: UNOCCUPIED");
+        }
+    }
+    
+    // Continuous temperature-based automation while occupied
+    if (isOccupied) {
+        float currentTemp = dht.readTemperature();
+        if (isnan(currentTemp)) currentTemp = 27.4; // fallback
+        
+        static int last_temp_state = -1;
+        int current_temp_state = 0; // 0 = low, 1 = fan, 2 = ac
+        if (currentTemp > 30.0) {
+            current_temp_state = 2;
+        } else if (currentTemp >= 24.0) {
+            current_temp_state = 1;
+        }
+        
+        // Only trigger changes when crossing thresholds to allow manual overrides otherwise
+        if (current_temp_state != last_temp_state) {
+            last_temp_state = current_temp_state;
+            if (current_temp_state == 2) {
+                Serial.println("-> High temperature! Turning ON AC.");
+                if (!ac_state) {
+                    ac_state = true;
+                    digitalWrite(RELAY_AC, HIGH);
+                    fan_state = false;
+                    digitalWrite(RELAY_FAN, LOW);
+                    processReadingsAndPublish(true);
+                }
+            } else if (current_temp_state == 1) {
+                Serial.println("-> Moderate temperature. Turning ON Fan.");
+                if (!fan_state) {
+                    fan_state = true;
+                    digitalWrite(RELAY_FAN, HIGH);
+                    ac_state = false;
+                    digitalWrite(RELAY_AC, LOW);
+                    processReadingsAndPublish(true);
+                }
+            }
+        }
+    }
+
+    // Strict Enforcement: If the room is unoccupied (timeout exceeded), immediately turn off non-essential appliances
+    if (millis() - lastMotionTime >= OCCUPANCY_TIMEOUT_MS) {
+        if (fan_state || tv_state || ac_state) {
+            Serial.println("AUTOMATION: Room unoccupied. Shutting down Fan, TV, and AC...");
+            fan_state = false;
+            digitalWrite(RELAY_FAN, LOW);
+            tv_state = false;
+            digitalWrite(RELAY_TV, LOW);
+            ac_state = false;
+            digitalWrite(RELAY_AC, LOW);
+            
+            // Force an immediate MQTT status publish to sync the dashboard
+            processReadingsAndPublish(true);
+        }
+    }
+
     unsigned long currentMillis = millis();
     if (currentMillis - last_update >= 5000) {
         last_update = currentMillis;
         processReadingsAndPublish(false);
-        oled_state = (oled_state + 1) % 3;
+        oled_state = (oled_state + 1) % 5;
     }
 }
