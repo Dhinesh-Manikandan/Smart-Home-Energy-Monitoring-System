@@ -16,7 +16,15 @@ class EnergyReadingCreate(BaseModel):
 
     appliance: str
 
+    state: str = "ON"
+
     alert: str
+
+    temperature: float | None = None
+
+    humidity: float | None = None
+
+    occupancy: str = "UNOCCUPIED"
 
 
 class EnergyReadingResponse(

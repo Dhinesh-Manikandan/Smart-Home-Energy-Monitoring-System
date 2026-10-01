@@ -94,3 +94,75 @@ def alert_chart(df):
     fig = px.histogram(df, x="alert", title="🚨 Alert Distribution")
 
     return apply_theme(fig)
+
+
+# ============================================================
+# APPLIANCE POWER DISTRIBUTION (DONUT)
+# ============================================================
+
+def power_distribution_chart(df):
+    fig = px.pie(
+        df,
+        names="appliance",
+        values="power",
+        title="⚡ Power Distribution by Appliance",
+        hole=0.55,
+    )
+    return apply_theme(fig)
+
+
+# ============================================================
+# APPLIANCE POWER COMPARISON (BAR)
+# ============================================================
+
+def power_comparison_chart(df):
+    fig = px.bar(
+        df,
+        x="appliance",
+        y="power",
+        title="📈 Appliance Power Consumption",
+        color="appliance"
+    )
+    return apply_theme(fig)
+
+
+# ============================================================
+# APPLIANCE COST DISTRIBUTION (BAR)
+# ============================================================
+
+def cost_distribution_chart(df):
+    fig = px.bar(
+        df,
+        x="appliance",
+        y="cost",
+        title="💰 Estimated Cost by Appliance",
+        color="appliance"
+    )
+    return apply_theme(fig)
+
+
+# ============================================================
+# TEMPERATURE TREND
+# ============================================================
+
+def temperature_chart(df):
+    df_clean = df.dropna(subset=['temperature'])
+    fig = px.line(
+        df_clean, x="timestamp", y="temperature", title="🌡️ Temperature Trend", markers=True
+    )
+    fig.update_traces(line_color="#ef4444")
+    return apply_theme(fig)
+
+
+# ============================================================
+# HUMIDITY TREND
+# ============================================================
+
+def humidity_chart(df):
+    df_clean = df.dropna(subset=['humidity'])
+    fig = px.line(
+        df_clean, x="timestamp", y="humidity", title="💧 Humidity Trend", markers=True
+    )
+    fig.update_traces(line_color="#3b82f6")
+    return apply_theme(fig)
+
